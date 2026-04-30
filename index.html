@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Network Cable Optimizer</title>
+  <style>
+    body { margin: 0; font-family: Inter, Arial, sans-serif; background:#0b1220; color:#e5e7eb; }
+    .layout { display:grid; grid-template-columns:300px 1fr; min-height:100vh; }
+    .panel { padding:16px; background:#111827; border-right:1px solid #243041; }
+    h1 { margin:0 0 8px; font-size:1.15rem; }
+    p { margin: 0 0 12px; color:#cbd5e1; font-size:.92rem; }
+    .btn { width:100%; border:0; border-radius:8px; padding:10px; margin:6px 0; font-weight:700; cursor:pointer; }
+    .btn.primary { background:#2563eb; color:#fff; }
+    .btn.secondary { background:#334155; color:#fff; }
+    .btn.warn { background:#9333ea; color:#fff; }
+    .row { display:flex; gap:8px; }
+    .row .btn { margin:6px 0; }
+    #stats { margin-top:12px; background:#1f2937; border-radius:8px; padding:10px; line-height:1.4; font-size:.9rem; }
+    .legend { margin-top:12px; font-size:.85rem; }
+    .item { display:flex; align-items:center; margin:5px 0; gap:8px; }
+    .dot { width:11px; height:11px; border-radius:50%; }
+    .canvas-wrap { display:grid; place-items:center; padding:16px; }
+    canvas { background:#f8fafc; border-radius:12px; box-shadow:0 0 0 1px #334155; max-width:100%; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel">
+      <h1>Network Cable Optimizer</h1>
+      <p>Click canvas to add computers. Drag nodes to move them. Run Prim or Kruskal to find minimum cable cost.</p>
+
+      <div class="row">
+        <button id="primBtn" class="btn primary">Run Prim</button>
+        <button id="kruskalBtn" class="btn primary">Run Kruskal</button>
+      </div>
+      <div class="row">
+        <button id="stepBtn" class="btn warn">Step Mode: Off</button>
+        <button id="clearMstBtn" class="btn secondary">Clear MST</button>
+      </div>
+      <button id="clearBtn" class="btn secondary">Clear All</button>
+
+      <div id="stats">Nodes: 0<br>MST Edges: 0<br>Total Cable Cost: 0.00<br>Algorithm: -</div>
+
+      <div class="legend">
+        <div class="item"><span class="dot" style="background:#94a3b8"></span>Possible cable links</div>
+        <div class="item"><span class="dot" style="background:#ef4444"></span>Selected MST links</div>
+        <div class="item"><span class="dot" style="background:#0f172a"></span>Computers (nodes)</div>
+      </div>
+    </aside>
+
+    <main class="canvas-wrap">
+      <canvas id="graph" width="980" height="640"></canvas>
+    </main>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('graph');
+    const ctx = canvas.getContext('2d');
+    const stats = document.getElementById('stats');
+
+    const nodes = [];
+    let mstEdges = [];
+    let currentAlgorithm = '-';
+    let stepMode = false;
+    let draggingIndex = -1;
+
+    const edgeKey = (u, v) => `${Math.min(u, v)}-${Math.max(u, v)}`;
+
+    function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+    function getAllEdges() {
+      const edges = [];
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          edges.push({ u: i, v: j, w: distance(nodes[i], nodes[j]) });
+        }
+      }
+      return edges;
+    }
+
+    function primMST() {
+      const n = nodes.length;
+      if (n < 2) return [];
+      const used = Array(n).fill(false);
+      used[0] = true;
+      const result = [];
+
+      while (result.length < n - 1) {
+        let best = null;
+        for (let u = 0; u < n; u++) {
+          if (!used[u]) continue;
+          for (let v = 0; v < n; v++) {
+            if (used[v] || u === v) continue;
+            const e = { u, v, w: distance(nodes[u], nodes[v]) };
+            if (!best || e.w < best.w) best = e;
+          }
+        }
+        if (!best) break;
+        used[best.v] = true;
+        result.push(best);
+      }
+      return result;
+    }
+
+    function kruskalMST() {
+      const n = nodes.length;
+      if (n < 2) return [];
+      const edges = getAllEdges().sort((a, b) => a.w - b.w);
+      const parent = Array.from({ length: n }, (_, i) => i);
+      const rank = Array(n).fill(0);
+
+      const find = (x) => parent[x] === x ? x : (parent[x] = find(parent[x]));
+      const union = (a, b) => {
+        a = find(a); b = find(b);
+        if (a === b) return false;
+        if (rank[a] < rank[b]) [a, b] = [b, a];
+        parent[b] = a;
+        if (rank[a] === rank[b]) rank[a]++;
+        return true;
+      };
+
+      const result = [];
+      for (const e of edges) {
+        if (union(e.u, e.v)) result.push(e);
+        if (result.length === n - 1) break;
+      }
+      return result;
+    }
+
+    function totalCost(edges) { return edges.reduce((sum, e) => sum + e.w, 0); }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const selected = new Set(mstEdges.map(e => edgeKey(e.u, e.v)));
+
+      const all = getAllEdges();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#94a3b8';
+      ctx.fillStyle = '#334155';
+      ctx.font = '11px Arial';
+      for (const e of all) {
+        const a = nodes[e.u], b = nodes[e.v];
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+
+        if (!stepMode || selected.has(edgeKey(e.u, e.v))) {
+          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          ctx.fillText(e.w.toFixed(0), mx + 4, my - 4);
+        }
+      }
+
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ef4444';
+      for (const e of mstEdges) {
+        const a = nodes[e.u], b = nodes[e.v];
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        ctx.beginPath();
+        ctx.fillStyle = '#0f172a';
+        ctx.arc(n.x, n.y, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '12px Arial';
+        ctx.fillText(i + 1, n.x, n.y);
+      }
+
+      stats.innerHTML = `Nodes: ${nodes.length}<br>MST Edges: ${mstEdges.length}<br>Total Cable Cost: ${totalCost(mstEdges).toFixed(2)}<br>Algorithm: ${currentAlgorithm}`;
+    }
+
+    function nodeAt(x, y) {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        if (distance(nodes[i], { x, y }) <= 14) return i;
+      }
+      return -1;
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      draggingIndex = nodeAt(x, y);
+      if (draggingIndex === -1) {
+        nodes.push({ x, y });
+        mstEdges = [];
+        currentAlgorithm = '-';
+        draw();
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (draggingIndex === -1) return;
+      const r = canvas.getBoundingClientRect();
+      nodes[draggingIndex] = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (currentAlgorithm === 'Prim') mstEdges = primMST();
+      if (currentAlgorithm === 'Kruskal') mstEdges = kruskalMST();
+      draw();
+    });
+
+    window.addEventListener('mouseup', () => { draggingIndex = -1; });
+
+    document.getElementById('primBtn').addEventListener('click', () => {
+      mstEdges = primMST();
+      currentAlgorithm = 'Prim';
+      draw();
+    });
+
+    document.getElementById('kruskalBtn').addEventListener('click', () => {
+      mstEdges = kruskalMST();
+      currentAlgorithm = 'Kruskal';
+      draw();
+    });
+
+    document.getElementById('clearMstBtn').addEventListener('click', () => {
+      mstEdges = [];
+      currentAlgorithm = '-';
+      draw();
+    });
+
+    document.getElementById('stepBtn').addEventListener('click', (e) => {
+      stepMode = !stepMode;
+      e.target.textContent = `Step Mode: ${stepMode ? 'On' : 'Off'}`;
+      draw();
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      nodes.length = 0;
+      mstEdges = [];
+      currentAlgorithm = '-';
+      draw();
+    });
+
+    draw();
+  </script>
+</body>
+</html>
