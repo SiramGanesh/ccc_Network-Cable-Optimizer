@@ -4,242 +4,752 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Network Cable Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { margin: 0; font-family: Inter, Arial, sans-serif; background:#0b1220; color:#e5e7eb; }
-    .layout { display:grid; grid-template-columns:300px 1fr; min-height:100vh; }
-    .panel { padding:16px; background:#111827; border-right:1px solid #243041; }
-    h1 { margin:0 0 8px; font-size:1.15rem; }
-    p { margin: 0 0 12px; color:#cbd5e1; font-size:.92rem; }
-    .btn { width:100%; border:0; border-radius:8px; padding:10px; margin:6px 0; font-weight:700; cursor:pointer; }
-    .btn.primary { background:#2563eb; color:#fff; }
-    .btn.secondary { background:#334155; color:#fff; }
-    .btn.warn { background:#9333ea; color:#fff; }
-    .row { display:flex; gap:8px; }
-    .row .btn { margin:6px 0; }
-    #stats { margin-top:12px; background:#1f2937; border-radius:8px; padding:10px; line-height:1.4; font-size:.9rem; }
-    .legend { margin-top:12px; font-size:.85rem; }
-    .item { display:flex; align-items:center; margin:5px 0; gap:8px; }
-    .dot { width:11px; height:11px; border-radius:50%; }
-    .canvas-wrap { display:grid; place-items:center; padding:16px; }
-    canvas { background:#f8fafc; border-radius:12px; box-shadow:0 0 0 1px #334155; max-width:100%; }
+    :root {
+      --bg: #08090d;
+      --surface: #0e1117;
+      --surface2: #141720;
+      --border: #1e2333;
+      --border2: #262d40;
+      --text: #e2e8f7;
+      --muted: #6272a4;
+      --accent: #5eead4;
+      --accent2: #f471b5;
+      --danger: #fb7185;
+      --edge-default: rgba(98, 114, 164, 0.35);
+      --edge-mst: #5eead4;
+      --node-bg: #141720;
+      --node-border: #5eead4;
+      --mono: 'Space Mono', monospace;
+      --display: 'Syne', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--display);
+      background: var(--bg);
+      color: var(--text);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Top Bar ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+    }
+
+    .logo-icon svg { width: 18px; height: 18px; }
+
+    .logo-text {
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    .header-hint {
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: var(--muted);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      padding: 4px 10px;
+      border-radius: 4px;
+    }
+
+    /* ── Main layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section:last-child { border-bottom: none; }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    /* ── Stat Cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: border-color .2s;
+    }
+
+    .stat-card.full { grid-column: 1 / -1; }
+
+    .stat-label {
+      font-family: var(--mono);
+      font-size: .6rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.pink   { color: var(--accent2); }
+
+    /* ── Algo Buttons ── */
+    .algo-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .algo-btn {
+      position: relative;
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 12px 10px;
+      background: var(--surface2);
+      cursor: pointer;
+      transition: border-color .2s, background .2s, transform .1s;
+      color: var(--text);
+      text-align: left;
+      font-family: var(--display);
+    }
+
+    .algo-btn:hover {
+      border-color: var(--accent);
+      background: rgba(94, 234, 212, .06);
+    }
+
+    .algo-btn:active { transform: scale(.97); }
+
+    .algo-btn.active {
+      border-color: var(--accent);
+      background: rgba(94, 234, 212, .1);
+    }
+
+    .algo-name {
+      font-size: .85rem;
+      font-weight: 700;
+    }
+
+    .algo-desc {
+      font-size: .65rem;
+      color: var(--muted);
+      margin-top: 2px;
+      font-family: var(--mono);
+    }
+
+    .algo-tag {
+      position: absolute;
+      top: 8px; right: 8px;
+      font-size: .55rem;
+      font-family: var(--mono);
+      background: rgba(94,234,212,.12);
+      color: var(--accent);
+      border-radius: 3px;
+      padding: 1px 5px;
+    }
+
+    /* ── Icon Buttons ── */
+    .icon-btn-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: .75rem;
+      font-family: var(--display);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+
+    .icon-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    .icon-btn:hover { color: var(--text); border-color: var(--border2); background: var(--surface); }
+
+    .icon-btn.step-on {
+      color: var(--accent2);
+      border-color: var(--accent2);
+      background: rgba(244, 113, 181, .08);
+    }
+
+    .icon-btn.danger:hover {
+      color: var(--danger);
+      border-color: var(--danger);
+      background: rgba(251, 113, 133, .06);
+    }
+
+    /* ── Legend ── */
+    .legend-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    .legend-line {
+      width: 24px; height: 2px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .legend-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 2px solid;
+      flex-shrink: 0;
+    }
+
+    /* ── Canvas Area ── */
+    .canvas-area {
+      position: relative;
+      background: var(--bg);
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Subtle grid background */
+    .canvas-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(94,234,212,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(94,234,212,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    canvas {
+      display: block;
+      cursor: crosshair;
+      position: absolute;
+      top: 0; left: 0;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-family: var(--mono);
+      font-size: .75rem;
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .3s, transform .3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Scrollbar ── */
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
   </style>
 </head>
+
 <body>
-  <div class="layout">
-    <aside class="panel">
-      <h1>Network Cable Optimizer</h1>
-      <p>Click canvas to add computers. Drag nodes to move them. Run Prim or Kruskal to find minimum cable cost.</p>
 
-      <div class="row">
-        <button id="primBtn" class="btn primary">Run Prim</button>
-        <button id="kruskalBtn" class="btn primary">Run Kruskal</button>
-      </div>
-      <div class="row">
-        <button id="stepBtn" class="btn warn">Step Mode: Off</button>
-        <button id="clearMstBtn" class="btn secondary">Clear MST</button>
-      </div>
-      <button id="clearBtn" class="btn secondary">Clear All</button>
-
-      <div id="stats">Nodes: 0<br>MST Edges: 0<br>Total Cable Cost: 0.00<br>Algorithm: -</div>
-
-      <div class="legend">
-        <div class="item"><span class="dot" style="background:#94a3b8"></span>Possible cable links</div>
-        <div class="item"><span class="dot" style="background:#ef4444"></span>Selected MST links</div>
-        <div class="item"><span class="dot" style="background:#0f172a"></span>Computers (nodes)</div>
-      </div>
-    </aside>
-
-    <main class="canvas-wrap">
-      <canvas id="graph" width="980" height="640"></canvas>
-    </main>
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#08090d" stroke-width="2.5" stroke-linecap="round">
+        <circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/>
+        <line x1="6" y1="6" x2="12" y2="18"/><line x1="18" y1="6" x2="12" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="6"/>
+      </svg>
+    </div>
+    <span class="logo-text">Net<span>MST</span></span>
   </div>
+  <div class="header-hint">Click canvas to add nodes · Drag to reposition</div>
+</header>
 
-  <script>
-    const canvas = document.getElementById('graph');
-    const ctx = canvas.getContext('2d');
-    const stats = document.getElementById('stats');
+<div class="layout">
 
-    const nodes = [];
-    let mstEdges = [];
-    let currentAlgorithm = '-';
-    let stepMode = false;
-    let draggingIndex = -1;
+  <aside class="sidebar">
 
-    const edgeKey = (u, v) => `${Math.min(u, v)}-${Math.max(u, v)}`;
+    <!-- Stats -->
+    <div class="sidebar-section">
+      <div class="section-label">Live Stats</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Nodes</div>
+          <div class="stat-value" id="statNodes">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">MST Edges</div>
+          <div class="stat-value" id="statEdges">0</div>
+        </div>
+        <div class="stat-card full">
+          <div class="stat-label">Total Cable Cost</div>
+          <div class="stat-value accent" id="statCost">0.00</div>
+        </div>
+        <div class="stat-card full">
+          <div class="stat-label">Algorithm</div>
+          <div class="stat-value pink" id="statAlgo">—</div>
+        </div>
+      </div>
+    </div>
 
-    function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    <!-- Algorithm -->
+    <div class="sidebar-section">
+      <div class="section-label">Algorithm</div>
+      <div class="algo-row">
+        <button class="algo-btn" id="primBtn">
+          <div class="algo-tag">Greedy</div>
+          <div class="algo-name">Prim's</div>
+          <div class="algo-desc">Grows from a seed</div>
+        </button>
+        <button class="algo-btn" id="kruskalBtn">
+          <div class="algo-tag">Sort</div>
+          <div class="algo-name">Kruskal</div>
+          <div class="algo-desc">Sorts all edges</div>
+        </button>
+      </div>
+    </div>
 
-    function getAllEdges() {
-      const edges = [];
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          edges.push({ u: i, v: j, w: distance(nodes[i], nodes[j]) });
+    <!-- Controls -->
+    <div class="sidebar-section">
+      <div class="section-label">Controls</div>
+      <div class="icon-btn-row" style="margin-bottom:8px">
+        <button class="icon-btn" id="stepBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polygon points="5,3 19,12 5,21"/>
+          </svg>
+          Step Mode
+        </button>
+        <button class="icon-btn" id="clearMstBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+          Clear MST
+        </button>
+      </div>
+      <button class="icon-btn danger" id="clearBtn" style="width:100%">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+        Clear All Nodes
+      </button>
+    </div>
+
+    <!-- Legend -->
+    <div class="sidebar-section">
+      <div class="section-label">Legend</div>
+      <div class="legend-list">
+        <div class="legend-item">
+          <div class="legend-line" style="background:rgba(98,114,164,.5)"></div>
+          Possible links
+        </div>
+        <div class="legend-item">
+          <div class="legend-line" style="background:#5eead4; height:3px"></div>
+          MST cable (optimal)
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="border-color:#5eead4; background:#141720"></div>
+          Computer node
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <main class="canvas-area">
+    <canvas id="graph"></canvas>
+  </main>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const canvas = document.getElementById('graph');
+  const ctx = canvas.getContext('2d');
+
+  // Size canvas to fill container
+  function resizeCanvas() {
+    const area = canvas.parentElement;
+    const w = area.offsetWidth;
+    const h = area.offsetHeight;
+    if (w > 0 && h > 0) {
+      canvas.width = w;
+      canvas.height = h;
+      draw();
+    }
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  // Defer so layout is fully rendered first
+  requestAnimationFrame(() => requestAnimationFrame(resizeCanvas));
+
+  const nodes = [];
+  let mstEdges = [];
+  let currentAlgorithm = '—';
+  let stepMode = false;
+  let draggingIndex = -1;
+  let toastTimer = null;
+
+  // Colors
+  const C = {
+    edgeDefault: 'rgba(98,114,164,0.28)',
+    edgeMst: '#5eead4',
+    nodeBg: '#141720',
+    nodeBorder: '#5eead4',
+    nodeText: '#e2e8f7',
+    labelText: 'rgba(98,114,164,0.85)',
+    mstLabel: '#5eead4',
+  };
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  const edgeKey = (u, v) => `${Math.min(u, v)}-${Math.max(u, v)}`;
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+  function getAllEdges() {
+    const edges = [];
+    for (let i = 0; i < nodes.length; i++)
+      for (let j = i + 1; j < nodes.length; j++)
+        edges.push({ u: i, v: j, w: dist(nodes[i], nodes[j]) });
+    return edges;
+  }
+
+  function primMST() {
+    const n = nodes.length;
+    if (n < 2) return [];
+    const used = Array(n).fill(false);
+    used[0] = true;
+    const result = [];
+    while (result.length < n - 1) {
+      let best = null;
+      for (let u = 0; u < n; u++) {
+        if (!used[u]) continue;
+        for (let v = 0; v < n; v++) {
+          if (used[v] || u === v) continue;
+          const e = { u, v, w: dist(nodes[u], nodes[v]) };
+          if (!best || e.w < best.w) best = e;
         }
       }
-      return edges;
+      if (!best) break;
+      used[best.v] = true;
+      result.push(best);
     }
+    return result;
+  }
 
-    function primMST() {
-      const n = nodes.length;
-      if (n < 2) return [];
-      const used = Array(n).fill(false);
-      used[0] = true;
-      const result = [];
-
-      while (result.length < n - 1) {
-        let best = null;
-        for (let u = 0; u < n; u++) {
-          if (!used[u]) continue;
-          for (let v = 0; v < n; v++) {
-            if (used[v] || u === v) continue;
-            const e = { u, v, w: distance(nodes[u], nodes[v]) };
-            if (!best || e.w < best.w) best = e;
-          }
-        }
-        if (!best) break;
-        used[best.v] = true;
-        result.push(best);
-      }
-      return result;
+  function kruskalMST() {
+    const n = nodes.length;
+    if (n < 2) return [];
+    const edges = getAllEdges().sort((a, b) => a.w - b.w);
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const rank = Array(n).fill(0);
+    const find = x => parent[x] === x ? x : (parent[x] = find(parent[x]));
+    const union = (a, b) => {
+      a = find(a); b = find(b);
+      if (a === b) return false;
+      if (rank[a] < rank[b]) [a, b] = [b, a];
+      parent[b] = a;
+      if (rank[a] === rank[b]) rank[a]++;
+      return true;
+    };
+    const result = [];
+    for (const e of edges) {
+      if (union(e.u, e.v)) result.push(e);
+      if (result.length === n - 1) break;
     }
+    return result;
+  }
 
-    function kruskalMST() {
-      const n = nodes.length;
-      if (n < 2) return [];
-      const edges = getAllEdges().sort((a, b) => a.w - b.w);
-      const parent = Array.from({ length: n }, (_, i) => i);
-      const rank = Array(n).fill(0);
+  function totalCost(edges) { return edges.reduce((s, e) => s + e.w, 0); }
 
-      const find = (x) => parent[x] === x ? x : (parent[x] = find(parent[x]));
-      const union = (a, b) => {
-        a = find(a); b = find(b);
-        if (a === b) return false;
-        if (rank[a] < rank[b]) [a, b] = [b, a];
-        parent[b] = a;
-        if (rank[a] === rank[b]) rank[a]++;
-        return true;
-      };
+  function updateStats() {
+    document.getElementById('statNodes').textContent = nodes.length;
+    document.getElementById('statEdges').textContent = mstEdges.length;
+    document.getElementById('statCost').textContent = totalCost(mstEdges).toFixed(1);
+    document.getElementById('statAlgo').textContent = currentAlgorithm;
+  }
 
-      const result = [];
-      for (const e of edges) {
-        if (union(e.u, e.v)) result.push(e);
-        if (result.length === n - 1) break;
-      }
-      return result;
-    }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    function totalCost(edges) { return edges.reduce((sum, e) => sum + e.w, 0); }
+    const mstSet = new Set(mstEdges.map(e => edgeKey(e.u, e.v)));
+    const all = getAllEdges();
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const selected = new Set(mstEdges.map(e => edgeKey(e.u, e.v)));
-
-      const all = getAllEdges();
+    // Default edges
+    for (const e of all) {
+      if (mstSet.has(edgeKey(e.u, e.v))) continue;
+      const a = nodes[e.u], b = nodes[e.v];
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = C.edgeDefault;
       ctx.lineWidth = 1;
-      ctx.strokeStyle = '#94a3b8';
-      ctx.fillStyle = '#334155';
-      ctx.font = '11px Arial';
-      for (const e of all) {
-        const a = nodes[e.u], b = nodes[e.v];
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+      ctx.setLineDash([4, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
-        if (!stepMode || selected.has(edgeKey(e.u, e.v))) {
-          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-          ctx.fillText(e.w.toFixed(0), mx + 4, my - 4);
-        }
-      }
-
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#ef4444';
-      for (const e of mstEdges) {
-        const a = nodes[e.u], b = nodes[e.v];
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        ctx.beginPath();
-        ctx.fillStyle = '#0f172a';
-        ctx.arc(n.x, n.y, 14, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
+      if (!stepMode) {
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        ctx.fillStyle = C.labelText;
+        ctx.font = '10px Space Mono, monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = '12px Arial';
-        ctx.fillText(i + 1, n.x, n.y);
+        ctx.fillText(e.w.toFixed(0), mx, my - 8);
       }
-
-      stats.innerHTML = `Nodes: ${nodes.length}<br>MST Edges: ${mstEdges.length}<br>Total Cable Cost: ${totalCost(mstEdges).toFixed(2)}<br>Algorithm: ${currentAlgorithm}`;
     }
 
-    function nodeAt(x, y) {
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        if (distance(nodes[i], { x, y }) <= 14) return i;
-      }
-      return -1;
+    // MST edges — glowing teal
+    for (const e of mstEdges) {
+      const a = nodes[e.u], b = nodes[e.v];
+
+      // Glow
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = 'rgba(94,234,212,0.12)';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      // Main line
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = C.edgeMst;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Label
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      ctx.fillStyle = C.mstLabel;
+      ctx.font = 'bold 10px Space Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Small pill background
+      const label = e.w.toFixed(0);
+      const lw = ctx.measureText(label).width + 8;
+      ctx.fillStyle = 'rgba(8,9,13,0.85)';
+      roundRect(ctx, mx - lw/2, my - 9, lw, 14, 4);
+      ctx.fill();
+      ctx.fillStyle = C.mstLabel;
+      ctx.fillText(label, mx, my - 1);
     }
 
-    canvas.addEventListener('mousedown', (e) => {
-      const r = canvas.getBoundingClientRect();
-      const x = e.clientX - r.left, y = e.clientY - r.top;
-      draggingIndex = nodeAt(x, y);
-      if (draggingIndex === -1) {
-        nodes.push({ x, y });
-        mstEdges = [];
-        currentAlgorithm = '-';
-        draw();
-      }
-    });
+    // Nodes
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const r = 16;
 
-    canvas.addEventListener('mousemove', (e) => {
-      if (draggingIndex === -1) return;
-      const r = canvas.getBoundingClientRect();
-      nodes[draggingIndex] = { x: e.clientX - r.left, y: e.clientY - r.top };
-      if (currentAlgorithm === 'Prim') mstEdges = primMST();
-      if (currentAlgorithm === 'Kruskal') mstEdges = kruskalMST();
-      draw();
-    });
+      // Outer glow ring
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(94,234,212,0.08)';
+      ctx.lineWidth = 6;
+      ctx.stroke();
 
-    window.addEventListener('mouseup', () => { draggingIndex = -1; });
+      // Node circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = C.nodeBg;
+      ctx.fill();
+      ctx.strokeStyle = C.nodeBorder;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-    document.getElementById('primBtn').addEventListener('click', () => {
-      mstEdges = primMST();
-      currentAlgorithm = 'Prim';
-      draw();
-    });
+      // Label
+      ctx.fillStyle = C.nodeText;
+      ctx.font = `bold 11px Space Mono, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(i + 1, n.x, n.y);
+    }
 
-    document.getElementById('kruskalBtn').addEventListener('click', () => {
-      mstEdges = kruskalMST();
-      currentAlgorithm = 'Kruskal';
-      draw();
-    });
+    updateStats();
+  }
 
-    document.getElementById('clearMstBtn').addEventListener('click', () => {
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function nodeAt(x, y) {
+    for (let i = nodes.length - 1; i >= 0; i--)
+      if (dist(nodes[i], { x, y }) <= 18) return i;
+    return -1;
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    draggingIndex = nodeAt(x, y);
+    if (draggingIndex === -1) {
+      nodes.push({ x, y });
       mstEdges = [];
-      currentAlgorithm = '-';
+      currentAlgorithm = '—';
+      showToast(`Node ${nodes.length} added`);
       draw();
-    });
+    }
+  });
 
-    document.getElementById('stepBtn').addEventListener('click', (e) => {
-      stepMode = !stepMode;
-      e.target.textContent = `Step Mode: ${stepMode ? 'On' : 'Off'}`;
-      draw();
-    });
-
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      nodes.length = 0;
-      mstEdges = [];
-      currentAlgorithm = '-';
-      draw();
-    });
-
+  canvas.addEventListener('mousemove', e => {
+    if (draggingIndex === -1) return;
+    const r = canvas.getBoundingClientRect();
+    nodes[draggingIndex] = { x: e.clientX - r.left, y: e.clientY - r.top };
+    if (currentAlgorithm === "Prim's") mstEdges = primMST();
+    if (currentAlgorithm === 'Kruskal') mstEdges = kruskalMST();
     draw();
-  </script>
+  });
+
+  window.addEventListener('mouseup', () => { draggingIndex = -1; });
+
+  document.getElementById('primBtn').addEventListener('click', () => {
+    if (nodes.length < 2) { showToast('Add at least 2 nodes first'); return; }
+    mstEdges = primMST();
+    currentAlgorithm = "Prim's";
+    document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('primBtn').classList.add('active');
+    showToast("Prim's MST computed");
+    draw();
+  });
+
+  document.getElementById('kruskalBtn').addEventListener('click', () => {
+    if (nodes.length < 2) { showToast('Add at least 2 nodes first'); return; }
+    mstEdges = kruskalMST();
+    currentAlgorithm = 'Kruskal';
+    document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('kruskalBtn').classList.add('active');
+    showToast('Kruskal MST computed');
+    draw();
+  });
+
+  document.getElementById('clearMstBtn').addEventListener('click', () => {
+    mstEdges = [];
+    currentAlgorithm = '—';
+    document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+    draw();
+  });
+
+  document.getElementById('stepBtn').addEventListener('click', function () {
+    stepMode = !stepMode;
+    this.classList.toggle('step-on', stepMode);
+    this.querySelector('svg').innerHTML = stepMode
+      ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+      : '<polygon points="5,3 19,12 5,21"/>';
+    showToast(`Step mode ${stepMode ? 'on — edge labels hidden' : 'off'}`);
+    draw();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    nodes.length = 0;
+    mstEdges = [];
+    currentAlgorithm = '—';
+    document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+    showToast('Canvas cleared');
+    draw();
+  });
+
+  draw();
+</script>
 </body>
 </html>
